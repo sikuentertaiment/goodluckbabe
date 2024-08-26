@@ -1,0 +1,279 @@
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spin Wheel App</title>
+    <!-- Google Font -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style type="text/css">
+      * {
+        padding: 0;
+        margin: 0;
+        box-sizing: border-box;
+        font-family: "Poppins", sans-serif;
+      }
+      body {
+        height: 100vh;
+        background: linear-gradient(135deg, #c3a3f1, #6414e9);
+      }
+      .wrapper {
+        width: 90%;
+        max-width: 34.37em;
+        max-height: 90vh;
+        position: absolute;
+        transform: translate(-50%, -50%);
+        top: 50%;
+        left: 50%;
+        padding: 3em;
+        border-radius: 1em;
+      }
+      .container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      #wheel {
+        max-height: inherit;
+        width: inherit;
+        top: 0;
+        padding: 0;
+      }
+      @keyframes rotate {
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      #spin-btn {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        top: 50%;
+        left: 50%;
+        height: 26%;
+        width: 26%;
+        border-radius: 50%;
+        cursor: pointer;
+        border: 0;
+        background: radial-gradient(#fdcf3b 50%, #d88a40 85%);
+        color: #c66e16;
+        text-transform: uppercase;
+        font-size: 1.8em;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+      }
+      .arrow-btn {
+        background: radial-gradient(#fdcf3b 50%, #d88a40 85%);
+      }
+      img {
+        position: absolute;
+        width: 4em;
+        top: 45%;
+        right: -8%;
+        transform: rotate(-180deg);
+        padding:10px;
+        background: white;
+        border-radius: 50%;
+      }
+      #final-value {
+        font-size: 1.5em;
+        text-align: center;
+        margin-top: 1.5em;
+        color: #202020;
+        font-weight: 500;
+      }
+      @media screen and (max-width: 768px) {
+        .wrapper {
+          font-size: 12px;
+        }
+        img {
+          right: -5%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <div class="container">
+        <canvas id="wheel"></canvas>
+        <button id="spin-btn">Spin</button>
+        <img src="./arrow_spinner.png" alt="spinner arrow" class="arrow-btn" />
+      </div>
+      <div id="final-value">
+        <p>Klik di spin yaa ayangg!</p>
+      </div>
+    </div>
+    <!-- Chart JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <!-- Chart JS Plugin for displaying text over chart -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.1.0/chartjs-plugin-datalabels.min.js"></script>
+    <!-- Script -->
+    <script>
+      const wheel = document.getElementById("wheel");
+      const spinBtn = document.getElementById("spin-btn");
+      const finalValue = document.getElementById("final-value");
+
+      // Persiapkan gambar yang akan digunakan
+      const images = [
+          './zonk_1.png',
+          './zonk.png',
+          './zonk_1.png',
+          './zonk.png',
+          './yay.png',
+          './zonk.png',
+      ];
+
+      const final_sounds = [
+          'audio_zonk',
+          'audio_zonk',
+          'audio_zonk',
+          'audio_zonk',
+          'audio_win',
+          'audio_zonk',
+      ];
+
+      audio_spin = new Audio();
+      audio_spin.src = './spin_sound.mp3';
+      
+      audio_zonk = new Audio();
+      audio_zonk.src = './zonk.mp3';
+      audio_zonk.onended = ()=>{
+        audio_zonk_1.play();
+      }
+
+      audio_zonk_1 = new Audio();
+      audio_zonk_1.src = './zonk_1.ogg';
+      audio_zonk_1.onended = ()=>{
+        spinBtn.disabled = false;
+      }
+
+      audio_win = new Audio();
+      audio_win.src = './win.mp3';
+
+      // Muat gambar ke dalam elemen Image
+      const imageElements = images.map(src => {
+          const img = new Image();
+          img.src = src;
+          return img;
+      });
+
+      const labels = ['Coba Lagi', 'Coba Lagi', 'Coba Lagi', 'Coba Lagi', 'Coba Lagi', 'Coba Lagi'];
+      const rotationValues = [
+          { minDegree: 0, maxDegree: 30, value: 2 },
+          { minDegree: 31, maxDegree: 90, value: 1 },
+          { minDegree: 91, maxDegree: 150, value: 6 },
+          { minDegree: 151, maxDegree: 210, value: 5 },
+          { minDegree: 211, maxDegree: 270, value: 4 },
+          { minDegree: 271, maxDegree: 330, value: 3 },
+          { minDegree: 331, maxDegree: 360, value: 2 },
+      ];
+      const data = [16, 16, 16, 16, 16, 16];
+      var pieColors = [
+          "#8b35bc",
+          "#b163da",
+          "#8b35bc",
+          "#b163da",
+          "#8b35bc",
+          "#b163da",
+      ];
+
+      //Create chart
+      let myChart = new Chart(wheel, {
+          plugins: [{
+              afterDatasetDraw: function(chart) { // Menggunakan afterDatasetDraw agar digambar setelah dataset (segmen) selesai digambar
+                const { ctx, chartArea: { width, height } } = chart;
+                const totalSegments = chart.config.data.labels.length;
+
+                ctx.save();
+
+                chart.config.data.labels.forEach((label, i) => {
+                    const meta = chart.getDatasetMeta(0).data[i];
+                    const centerX = width / 2;
+                    const centerY = height / 2;
+                    const angle = (meta.startAngle + meta.endAngle) / 2;
+
+                    // Tentukan offset radial untuk memindahkan gambar ke dalam atau keluar
+                    const radialOffset = 74; // Ubah nilai ini sesuai kebutuhan untuk menggeser gambar lebih ke dalam
+                    const imgSize = 84;
+
+                    // Hitung posisi gambar menggunakan sin dan cos untuk mendapatkan posisi berdasarkan sudut segmen
+                    const xPos = centerX + (meta.outerRadius - radialOffset) * Math.cos(angle);
+                    const yPos = centerY + (meta.outerRadius - radialOffset) * Math.sin(angle);
+
+                    // Gambar gambar di posisi yang ditentukan
+                    ctx.drawImage(imageElements[i], xPos - imgSize / 2, yPos - imgSize / 2, imgSize, imgSize);
+                });
+
+                ctx.restore();
+              }
+          }],
+          type: "pie",
+          data: {
+              labels,
+              datasets: [{
+                  backgroundColor: pieColors,
+                  data: data,
+              }],
+          },
+          options: {
+              responsive: true,
+              animation: { duration: 0 },
+              plugins: {
+                  tooltip: false,
+                  legend: { display: false },
+                  datalabels: {
+                      display: false, // Sembunyikan teks label karena kita akan mengganti dengan gambar
+                  },
+              },
+          },
+      });
+
+      // display value based on the randomAngle
+      const valueGenerator = (angleValue) => {
+          for (let i of rotationValues) {
+              if (angleValue >= i.minDegree && angleValue <= i.maxDegree) {
+                  finalValue.innerHTML = `<p>${labels[i.value - 1]}</p>`;
+                  window[final_sounds[i.value - 1]].play();
+                  break;
+              }
+          }
+      };
+
+      let count = 0;
+      let resultValue = 101;
+      spinBtn.addEventListener("click", () => {
+          audio_spin.play();
+          spinBtn.disabled = true;
+          finalValue.innerHTML = `<p>Semoga Beruntung!!!</p>`;
+          let randomDegree = Math.floor(Math.random() * (355 - 0 + 1) + 0);
+
+          // Durasi total untuk rotasi (ms)
+          const totalDuration = 11000;
+          // Interval waktu untuk setiap update rotasi (ms)
+          const frameDuration = 10;
+          // Menghitung jumlah frame
+          const totalFrames = totalDuration / frameDuration;
+          
+          let currentFrame = 0;
+
+          const rotationInterval = setInterval(() => {
+              currentFrame++;
+              // Menggunakan easing function untuk menghitung posisi rotasi yang lebih smooth
+              const easeOutQuad = (t) => t * (2 - t);
+              const easedProgress = easeOutQuad(currentFrame / totalFrames);
+
+              const rotationValue = easedProgress * (360 * 15) + randomDegree;
+
+              myChart.options.rotation = rotationValue % 360;
+              myChart.update();
+
+              if (currentFrame >= totalFrames) {
+                  clearInterval(rotationInterval);
+                  valueGenerator(randomDegree);
+              }
+          }, frameDuration);
+      });
+
+    </script>
+  </body>
+</html>
